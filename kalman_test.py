@@ -8,14 +8,14 @@ from scipy import signal
 T = 0.5   # Time period
 T_START = 0
 T_STOP = 5
-N_POINTS = 50000
+N_POINTS = 100000
 
 
 if __name__ == "__main__":
     # Generate the sawtooth wave
     t = np.linspace(T_START, T_STOP, N_POINTS, endpoint=False)  # Time array
-    wave = signal.sawtooth(2 * np.pi * 1/T * t, 0.5)
-    #wave = np.sin(2 * np.pi * 1/T * t)
+    #wave = signal.sawtooth(2 * np.pi * 1/T * t, 0.5)
+    wave = np.sin(2 * np.pi * 1/T * t)
 
     mean = 0
     std_dev = 1  # Standard deviation
@@ -25,10 +25,10 @@ if __name__ == "__main__":
     signal = wave + noise
     init_x = 0
     init_x1 = 0
-    init_p = 1
-    init_p1 = 1
+    init_p = 10
+    init_p1 = 10
     init_q = 0.0001
-    init_r = 0.001
+    init_r = 1
     kalman_filter = Kalman(init_x, init_x1, init_p, init_p1, init_q, init_r)
     filtered_values = []
     for x in signal:
