@@ -28,7 +28,7 @@ if __name__ == "__main__":
     init_p = 1
     init_p1 = 1
     init_q = 0.0001
-    init_r = 0.0009
+    init_r = 0.001
     kalman_filter = Kalman(init_x, init_x1, init_p, init_p1, init_q, init_r)
     filtered_values = []
     for x in signal:
