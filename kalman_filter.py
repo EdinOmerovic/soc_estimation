@@ -31,7 +31,7 @@ class Kalman(object):
     Used to update the estimate based on the new measured data
     '''
     def update(self, measured_value):
-        self.Kn = self.previous_variance_x2/(self.previous_variance_x2 + self.measurement_noise) 
+        self.Kn = self.previous_variance_x1/(self.previous_variance_x1 + self.measurement_noise) 
         
         # State update
         self.current_estimate_x1 = self.previous_estimate_x1 + self.Kn*(measured_value - self.previous_estimate_x1)
