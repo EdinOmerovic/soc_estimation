@@ -31,10 +31,11 @@ if __name__ == "__main__":
     init_r = 1
     kalman_filter = Kalman(init_x, init_x1, init_p, init_p1, init_q, init_r)
     filtered_values = []
+    TIME_STEP = (T_STOP - T_START)/N_POINTS
     for x in signal:
         val = kalman_filter.update(x)
         filtered_values.append(val)
-        kalman_filter.predict((T_STOP - T_START)/N_POINTS)
+        kalman_filter.predict(TIME_STEP)
 
     # Plot the wave
     plt.figure(figsize=(8,6))
