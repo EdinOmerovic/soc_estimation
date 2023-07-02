@@ -49,9 +49,9 @@ class Kalman(object):
     def predict(self, time_step):
 
         # State extrapolation
-        self.previous_estimate_x1 = self.current_estimate_x1 + time_step*self.current_estimate_x2
         self.previous_estimate_x2 = self.current_estimate_x2
+        self.previous_estimate_x1 = self.current_estimate_x1 + time_step*self.current_estimate_x2
 
         # Variance extrapolation
-        self.previous_variance_x1 = self.current_variance_x1 + self.current_variance_x2*time_step**2
         self.previous_variance_x2 = self.current_variance_x2 + self.process_noise
+        self.previous_variance_x1 = self.current_variance_x1 + self.current_variance_x2*time_step**2

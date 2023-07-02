@@ -14,8 +14,8 @@ N_POINTS = 100000
 if __name__ == "__main__":
     # Generate the sawtooth wave
     t = np.linspace(T_START, T_STOP, N_POINTS, endpoint=False)  # Time array
-    #wave = signal.sawtooth(2 * np.pi * 1/T * t, 0.5)
-    wave = np.sin(2 * np.pi * 1/T * t)
+    wave = signal.sawtooth(2 * np.pi * 1/T * t, 0.5)
+    #wave = np.sin(2 * np.pi * 1/T * t)
 
     mean = 0
     std_dev = 1  # Standard deviation
