@@ -77,7 +77,7 @@ def plot_values(axs, *argv):
     axs[0].legend(["Noisy measurement", "Estimated value", "True value"])
     
     # Second plot is for the filter internal coefficients
-    axs[1].plot(argv[1][0])
+    axs[1].plot(t, argv[1])
     axs[1].legend(["Kalman gain"])
     title.set_text(f"meas noise = {kalman_filter.Q}, process noise = {kalman_filter.std_acc}, cumulative measure noise = {doprinos_noise}")
     plt.show()
