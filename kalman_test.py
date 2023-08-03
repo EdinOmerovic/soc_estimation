@@ -8,8 +8,8 @@ from wave import Wave
 # Kalman filter classes
 from kalman_filter import Kalman
 from kalman_filter2d import KalmanFilter2D
-#from kalman_matrix import KalmanMatrix
-from kalman_soc import KalmanMatrix
+from kalman_matrix import KalmanMatrix
+from kalman_soc import KalmanSoC
 
 # Wave parameters:
 T_START = 0
@@ -18,8 +18,8 @@ N_POINTS = 500
 TIME_STEP = (T_STOP - T_START)/N_POINTS
 
 initial_measure_noise = 2
-initial_process_noise = 0.1
-initial_doprinos_noise = 0.1
+initial_process_noise = 0.01
+initial_doprinos_noise = 0.05
 doprinos_noise = initial_doprinos_noise
 # SIGNAL GENERATION
 T_wave = 2  # Time period
@@ -35,28 +35,27 @@ bias = 2.5*(signal.sawtooth(2 * np.pi * 2/T_STOP * t, 0.5) + 1)
 wave.add_noise(initial_measure_noise)
 #wave.add_bias(bias)
 
-kalman_filterMat = None
 
 def slider_update_noise(slider_var):
     # Get slider values:
     std_dev_slider = slider_std_dev.val
     doprinos_noise = cumulative_measure_noise.val
     #kalman_filter.measurement_noise = std_dev_slider
-    kalman_filterMat.Q = std_dev_slider
+    kalman_filter.Q = std_dev_slider
     noisy_measurements = wave.add_noise(std_dev_slider)
     
     # Get all plots from first subplot
     plots = axs[0].get_lines()    
     plots[0].set_ydata(noisy_measurements)
     
-    iterate_and_plot(wave, kalman_filterMat, doprinos_noise)
+    iterate_and_plot(wave, kalman_filter, doprinos_noise)
     fig.canvas.draw_idle()
     plt.show()
 
 def slider_update_process_noise(slider_var):
     #kalman_filter.process_noise = slider_process_noise.val
-    kalman_filterMat.P = slider_process_noise.val
-    iterate_and_plot(wave, kalman_filterMat, doprinos_noise)
+    kalman_filter.P = slider_process_noise.val
+    iterate_and_plot(wave, kalman_filter, doprinos_noise)
     fig.canvas.draw_idle()
     plt.show()
     
@@ -80,7 +79,7 @@ def plot_values(axs, *argv):
     # Second plot is for the filter internal coefficients
     axs[1].plot(argv[1][0])
     axs[1].legend(["Kalman gain"])
-    title.set_text(f"meas noise = {kalman_filterMat.Q}, process noise = {kalman_filterMat.std_acc}, cumulative measure noise = {doprinos_noise}")
+    title.set_text(f"meas noise = {kalman_filter.Q}, process noise = {kalman_filter.std_acc}, cumulative measure noise = {doprinos_noise}")
     plt.show()
 
 
@@ -143,9 +142,9 @@ if __name__ == "__main__":
     #kalman_filter = Kalman(init_x, init_x1, init_p, init_p1, initial_measure_noise, initial_measure_noise)
     #kalman_filter2d = KalmanFilter2D(TIME_STEP, 0.1, 1.25, 1.25)
     #kalman_filterMat = KalmanMatrix(TIME_STEP, initial_process_noise, initial_measure_noise)
-    kalman_filterMat = KalmanMatrix(TIME_STEP, initial_process_noise, initial_measure_noise)
+    kalman_filter = KalmanSoC(TIME_STEP, initial_process_noise, initial_measure_noise)
     
-    iterate_and_plot(wave, kalman_filterMat, initial_doprinos_noise)
+    iterate_and_plot(wave, kalman_filter, initial_doprinos_noise)
         
     
     

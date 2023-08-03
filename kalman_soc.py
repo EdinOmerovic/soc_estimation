@@ -1,6 +1,6 @@
 import numpy as np
 
-class KalmanMatrix():
+class KalmanSoC():
     def __init__(self, dt, std_acc, std_meas):
         self.dt = dt
         #self.u = u
