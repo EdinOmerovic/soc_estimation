@@ -13,10 +13,10 @@ from wave import Wave
 T_wave = 2  # Time period
 T_START = 0
 T_STOP = 5
-N_POINTS = 5000
+N_POINTS = 500
 TIME_STEP = (T_STOP - T_START)/N_POINTS
 initial_measure_noise = 10
-initial_process_noise = 0.1
+initial_process_noise = 0.001
 
 # SIGNAL GENERATION
 SIGNAL_AMPLITUDE = 10
@@ -97,8 +97,8 @@ def iterate_and_plot(wave, kalman_filter):
         
         
         # doprinost = novoizmjerenja vrijednost - prethodna vrijednost.
-        #doprinos = wave.waveform[i] - previous_x
-        doprinos = 0
+        doprinos = wave.waveform[i] - previous_x
+        #doprinos = 0
         val = kalman_filter.predict(doprinos)
         
         

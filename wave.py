@@ -2,12 +2,13 @@ import numpy as np
 
 class Wave: 
     def __init__(self, waveform):
-        self.waveform = waveform
         self.signal_gain = 1
-        self.signal_noise = None
-        self.signal_bias = None
         self.signal_mean = 0
         self.noise_mean = 0
+        
+        self.waveform = waveform
+        self.signal_noise = None
+        self.signal_bias = None
         
         
     def add_noise(self, std_dev):
