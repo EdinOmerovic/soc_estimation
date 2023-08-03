@@ -13,10 +13,12 @@ from wave import Wave
 T_wave = 2  # Time period
 T_START = 0
 T_STOP = 5
-N_POINTS = 500
+N_POINTS = 100
 TIME_STEP = (T_STOP - T_START)/N_POINTS
-initial_measure_noise = 10
+
+initial_measure_noise = 2
 initial_process_noise = 0.001
+doprinos_noise = 0.1
 
 # SIGNAL GENERATION
 SIGNAL_AMPLITUDE = 10
@@ -25,7 +27,6 @@ t = np.linspace(T_START, T_STOP, N_POINTS, endpoint=False)
 # Generate the sawtooth wave
 triangle_wave= SIGNAL_AMPLITUDE*signal.sawtooth(2 * np.pi * 1/T_wave * t, 0.5)
 sine_wave = SIGNAL_AMPLITUDE*np.sin(2 * np.pi * 1/T_wave * t)
-
 
 
 #    # Setting up the initial conditions for the estimator
@@ -97,7 +98,7 @@ def iterate_and_plot(wave, kalman_filter):
         
         
         # doprinost = novoizmjerenja vrijednost - prethodna vrijednost.
-        doprinos = wave.waveform[i] - previous_x
+        doprinos = wave.waveform[i] - np.random.normal(previous_x, doprinos_noise)
         #doprinos = 0
         val = kalman_filter.predict(doprinos)
         
