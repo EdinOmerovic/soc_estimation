@@ -26,6 +26,8 @@ class KalmanMatrix():
         
         self.P = self.std_acc #Vjerodostojnost inicijalne pretpostavke. Može biti drugačija
         
+        self.K = 0
+        
         self.x = 0
         
         
@@ -44,7 +46,7 @@ class KalmanMatrix():
         S = self.C*self.P*self.C + self.Q
         # Calculate the Kalman Gain
         # K = P * H'* inv(H*P*H'+R)
-        K = (self.P*self.C) / S  # Eq.(11)
-        self.x = self.x + K*(z - self.C*self.x)  # Eq.(12)
+        self.K = (self.P*self.C) / S  # Eq.(11)
+        self.x = self.x + self.K*(z - self.C*self.x)  # Eq.(12)
         #I = np.eye(self.C.shape[1])
-        self.P = (1 - K *self.C)*self.P  # Eq.(13)
+        self.P = (1 - self.K *self.C)*self.P  # Eq.(13)
