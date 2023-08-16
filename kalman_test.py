@@ -22,6 +22,21 @@ measure_noise = 2
 process_noise = 0.01
 doprinos_noise = 0.05
 
+# Setting up the initial conditions for the estimator
+# Initial guess
+init_x = 0
+# Uncertainty of the initial guess
+init_p = 1
+
+# KALMAN FILTER INIT
+#     #kalman_filter = Kalman(init_x, init_x1, init_p, init_p1, initial_measure_noise, initial_measure_noise)
+#     #kalman_filter2d = KalmanFilter2D(TIME_STEP, 0.1, 1.25, 1.25)
+#     #kalman_filterMat = KalmanMatrix(TIME_STEP, initial_process_noise, initial_measure_noise)
+#     kalman_filter = KalmanSoC(TIME_STEP, process_noise, measure_noise, init_x, init_p)
+
+kalman_filter = KalmanSoC(TIME_STEP, process_noise, measure_noise, init_x, init_p)
+
+
 # SIGNAL GENERATION
 T_wave = 2  # Time period
 SIGNAL_AMPLITUDE = 10
@@ -38,16 +53,17 @@ wave.add_noise(measure_noise)
 #wave.add_bias(bias)
 
 
-#def update sliders
-
 def update_sliders(slider_var):
     # Get slider values:
     global measure_noise, doprinos_noise, process_noise 
     measure_noise = meas_noise_slider.val
     doprinos_noise = cum_noise_slider.val
     process_noise = process_noise_slider.val
+    
     #kalman_filter.measurement_noise = slider_std_dev.val
     
+    
+    kalman_filter = KalmanSoC(TIME_STEP, process_noise, measure_noise, init_x, init_p)
     
     # TODO: add as an option not to update it in the kalman gain. 
     kalman_filter.Q_meas_uncern = measure_noise
@@ -126,39 +142,32 @@ fig, axs = plt.subplots(2, 1, figsize=(6, 9))
 title = plt.suptitle(t='', fontsize = 12)
 
 # Create space for sliders 
-plt.subplots_adjust(bottom=0.25)
+plt.subplots_adjust(bottom=0.20)
 # Create sliders for mean and standard deviation
-ax_std_dev = plt.axes([0.15, 0.05, 0.65, 0.03], facecolor='lightgoldenrodyellow')
-ax_process_noise = plt.axes([0.15, 0.1, 0.65, 0.03], facecolor='lightgoldenrodyellow')
-ax_cumulative_measure_noise = plt.axes([0.15, 0.15, 0.65, 0.03], facecolor='lightgoldenrodyellow')
+
+widget_witdh = 0.65
+widget_heigth = 0.02
+
+widget_start_x = 0.15
+widget_start_y = 0.03
+
+ax_plot_button =              plt.axes([widget_start_x, widget_start_y + 0*1.5*widget_heigth, widget_witdh, widget_heigth], facecolor='lightgoldenrodyellow')
+ax_std_dev =                  plt.axes([widget_start_x, widget_start_y + 1*1.5*widget_heigth, widget_witdh, widget_heigth], facecolor='lightgoldenrodyellow')
+ax_process_noise =            plt.axes([widget_start_x, widget_start_y + 2*1.5*widget_heigth, widget_witdh, widget_heigth], facecolor='lightgoldenrodyellow')
+ax_cumulative_measure_noise = plt.axes([widget_start_x, widget_start_y + 3*1.5*widget_heigth, widget_witdh, widget_heigth], facecolor='lightgoldenrodyellow')
 
 
-process_noise_slider = Slider(ax_process_noise, 'Process noise', 0, 5, valinit=process_noise)
-meas_noise_slider = Slider(ax_std_dev, 'Std Dev', 0, 5, valinit=measure_noise)
-cum_noise_slider = Slider(ax_cumulative_measure_noise, 'Cumulative noise', 0, 5, valinit=doprinos_noise)
+replot_button = Button(ax_plot_button, 'Plot')
+meas_noise_slider =    Slider(ax_std_dev, 'Absolute noise (voltage)', 0, 8, valinit=measure_noise)
+process_noise_slider = Slider(ax_process_noise, 'Process noise', 0, 8, valinit=process_noise)
+cum_noise_slider =     Slider(ax_cumulative_measure_noise, 'Differential noise (charge)', 0, 8, valinit=doprinos_noise)
+
 #Slider callback functions
 process_noise_slider.on_changed(update_sliders)
 meas_noise_slider.on_changed(update_sliders)
 cum_noise_slider.on_changed(update_sliders)
-
-
-
-kalman_filter = None
-if __name__ == "__main__":
-    # Setting up the initial conditions for the estimator
-    # Initial guess
-    init_x = 0
-    init_x1 = 0
-    # Variance of the initial guess
-    init_p = 1
-    init_p1 = 1
-    
-    #kalman_filter = Kalman(init_x, init_x1, init_p, init_p1, initial_measure_noise, initial_measure_noise)
-    #kalman_filter2d = KalmanFilter2D(TIME_STEP, 0.1, 1.25, 1.25)
-    #kalman_filterMat = KalmanMatrix(TIME_STEP, initial_process_noise, initial_measure_noise)
-    kalman_filter = KalmanSoC(TIME_STEP, process_noise, measure_noise)
-    
-    iterate_and_plot(wave, kalman_filter, doprinos_noise)
+replot_button.on_clicked(update_sliders)
         
     
-    
+if __name__ == "__main__":
+    iterate_and_plot(wave, kalman_filter, doprinos_noise)
