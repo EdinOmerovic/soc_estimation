@@ -19,8 +19,8 @@ class Wave:
             waveform = self.waveform
             
         for i, x in enumerate(waveform):
-            noise = np.random.normal(self.noise_mean, std_dev)
-            self.signal_noise[i] = x + noise
+            # std_dev can be a function of a waveform. 
+            self.signal_noise[i] = np.random.normal(x + self.noise_mean, std_dev)
         return self.signal_noise
     
     def add_bias(self, bias_waveform):
