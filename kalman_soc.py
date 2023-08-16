@@ -35,29 +35,33 @@ class KalmanSoC():
         # Initial state uncertainty. The uncertainty of the initial guess.
         self.P = init_uncern  
         
-        # Kalman gain
-        self.K_gain = 1 
         
         # Initial state estimation
         self.x = init_x
         
+        # Kalman gain
+        self.K_gain = 1
+         
         
     def predict(self, sys_input):
-        # Ref :Eq.(9) and Eq.(10)
-        # Update time state
-        self.x = self.A *self.x + self.B*sys_input
+        # Update the state based on previous state and input:
+        self.x = self.A * self.x + self.B * sys_input
         # Calculate error covariance
         # P= A*P*A' + R
-        self.P = self.A *self.P* self.A + self.R_proc_uncern
+        self.P = self.A * self.P * self.A + self.R_proc_uncern
         return self.x
     
     def update(self, z):
-        # Ref :Eq.(11) , Eq.(11) and Eq.(13)
+        # Give name for this matrix.
         # S = H*P*H'+R
         S = self.C*self.P*self.C + self.Q_meas_uncern
+        
         # Calculate the Kalman Gain
-        # K = P * H'* inv(H*P*H'+R)
-        self.K_gain = (self.P*self.C) / S  # Eq.(11)
-        self.x = self.x + self.K_gain*(z - self.C*self.x)  # Eq.(12)
+        # K = P * H'* inv(S)
+        self.K_gain = (self.P*self.C) / S
+        
+        self.x = self.x + self.K_gain*(z - self.C*self.x)
         #I = np.eye(self.C.shape[1])
-        self.P = (1 - self.K_gain *self.C)*self.P  # Eq.(13)
+        self.P = (1 - self.K_gain *self.C)*self.P
+        
+        return self.x
