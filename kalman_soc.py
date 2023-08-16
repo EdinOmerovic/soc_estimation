@@ -7,7 +7,7 @@ TODO: add the ability to modify the variances during the execution.
 import numpy as np
 
 class KalmanSoC():
-    def __init__(self, dt, init_proc_uncern, init_meas_uncern):
+    def __init__(self, dt, init_proc_uncern, init_meas_uncern, init_x, init_uncern):
         self.dt = dt        
         # State transition matrix determines how the state is going to evolve in time (by itself).
         self.A = 1 # In our case we use constant unit matrix because we suppose that the state won't change by itself if not provoked. 
@@ -33,13 +33,13 @@ class KalmanSoC():
         self.Q_meas_uncern = init_meas_uncern 
         
         # Initial state uncertainty. The uncertainty of the initial guess.
-        self.P = init_proc_uncern  
+        self.P = init_uncern  
         
         # Kalman gain
         self.K_gain = 1 
         
         # Initial state estimation
-        self.x = 0 
+        self.x = init_x
         
         
     def predict(self, sys_input):
