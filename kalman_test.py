@@ -16,11 +16,12 @@ T_START = 0
 T_STOP = 5
 N_POINTS = 500
 TIME_STEP = (T_STOP - T_START)/N_POINTS
-
+# NOISE values
 initial_measure_noise = 2
 initial_process_noise = 0.01
 initial_doprinos_noise = 0.05
 doprinos_noise = initial_doprinos_noise
+
 # SIGNAL GENERATION
 T_wave = 2  # Time period
 SIGNAL_AMPLITUDE = 10
@@ -41,7 +42,7 @@ def slider_update_noise(slider_var):
     std_dev_slider = slider_std_dev.val
     doprinos_noise = cumulative_measure_noise.val
     #kalman_filter.measurement_noise = std_dev_slider
-    kalman_filter.Q = std_dev_slider
+    kalman_filter.Q_meas_uncern = std_dev_slider
     noisy_measurements = wave.add_noise(std_dev_slider)
     
     # Get all plots from first subplot
@@ -79,27 +80,32 @@ def plot_values(axs, *argv):
     # Second plot is for the filter internal coefficients
     axs[1].plot(t, argv[1])
     axs[1].legend(["Kalman gain"])
-    title.set_text(f"meas noise = {kalman_filter.Q}, process noise = {kalman_filter.std_acc}, cumulative measure noise = {doprinos_noise}")
+    title.set_text(f"meas noise = {kalman_filter.Q_meas_uncern}, process noise = {kalman_filter.R_proc_uncern}, cumulative measure noise = {doprinos_noise}")
     plt.show()
 
 
-def iterate_and_plot(wave, kalman_filter, doprinos_noise):
+def iterate_and_plot(wave, kalman_filter, charge_measurement_noise):
     #Initialize all lists to be used for storing the values to be plotted
     
     filtered_values = [None]*len(wave.signal_noise)
     K_values = [None]*len(wave.signal_noise)
     
-    previous_x = 0
+    previous_x = wave.waveform[0]
     # Iterate through the input wave:
     for i, x in enumerate(wave.signal_noise):
-        # doprinost = novoizmjerenja vrijednost - prethodna vrijednost.
-        doprinos = np.random.normal(wave.waveform[i] - previous_x, doprinos_noise)
-        val = kalman_filter.predict(doprinos)
+        
+        # The virtual charge measurement emulates the task consumption measured by Joulescope.
+        # virtual charge measurement = new wave value - previous wave value + noise.
+        charge_measurement = np.random.normal(wave.waveform[i] - previous_x, charge_measurement_noise)
+        val = kalman_filter.predict(charge_measurement)
+        
+        
         # Store the values in the list to be plotted
         filtered_values[i] = val
-        K_values[i] = kalman_filter.K
+        K_values[i] = kalman_filter.K_gain
         
         # KALMAN PREDICT
+        # In this case the x is soc evaluation based on the ECM model and OCV-SOC evaluation.
         kalman_filter.update(x)
         previous_x = wave.waveform[i]
         
