@@ -20,7 +20,7 @@ TIME_STEP = (T_STOP - T_START)/N_POINTS
 
 # Initial noise values
 measure_noise_global = 0.25
-process_noise_global = 0.001
+process_noise_global = 0.0001
 doprinos_noise_global = 0.005
 
 # Setting up the initial conditions for the estimator
@@ -52,26 +52,25 @@ sine_wave = SIGNAL_AMPLITUDE*np.sin(2 * np.pi * 1/T_wave * t)
 wave = Wave(triangle_wave)
 
 #bias = 2.5*(signal.sawtooth(2 * np.pi * 2/T_STOP * t, 0.5) + 1)
-bias = [0]*len(wave.waveform)
+#bias = [0]*len(wave.waveform)
 
 wave.add_noise(measure_noise_global)
-wave.add_bias(bias)
+#wave.add_bias(bias)
 
 
 def update_sliders(slider_var):
+    global kalman_filter
+    global measure_noise_global, doprinos_noise_global, process_noise_global
     # Get slider values and update the global values.
-    global measure_noise_global, doprinos_noise_global, process_noise_global, kalman_filter
     measure_noise_global = meas_noise_slider.val
     doprinos_noise_global = cum_noise_slider.val
     process_noise_global = process_noise_slider.val
     
     
     # TODO: add feature to add variable noise. I want noise to be a function of state of charge.  
-    noisy_measurements = wave.add_noise(measure_noise_global)
-    
-    # Get all plots from first subplot
-    plots = axs[0].get_lines()    
-    plots[0].set_ydata(noisy_measurements)
+    wave.add_noise(measure_noise_global)
+    kalman_filter.reset()
+
     
     if radio.value_selected == 'Update volt. meas noise': 
         kalman_filter.Q_meas_uncern = measure_noise_global
@@ -87,19 +86,28 @@ def update_sliders(slider_var):
     plt.show()
     
     
+def get_mse(true, actual):
+    cumsum = 0
+    for true_val, actual_val in zip(true, actual):
+        cumsum = cumsum + (true_val - actual_val)**2
+    return cumsum
 
 def plot_values(axs, *argv):
     assert len(argv) == len(axs)
+    
     #Delete any previous plots
     for a in axs:
         a.cla()
     
     
     # First plot is for time plots of the signals
-    axs[0].set_title('Estimation based on measurement')
+    mean_square_error = get_mse(argv[0][0], argv[0][1])  
+    mean_square_error1 = get_mse(argv[0][0], argv[0][2])
+    
+    axs[0].set_title(f'Estimation based on measurement. MSE ={mean_square_error}, MSE = {mean_square_error1}')
     axs[0].plot(t, argv[0][0], "oy",) #Measured value
-    axs[0].plot(t, argv[0][1], "b") #Estimated value
-    axs[0].plot(t, argv[0][2]) # Actual value
+    axs[0].plot(t, argv[0][1], "0.5") #Estimated value
+    axs[0].plot(t, argv[0][2], "b") # Actual value
     axs[0].plot(t, argv[0][3], "g--") # Actual value
     axs[0].legend(["Noisy measurement", "Estimated value (apriori)", "Estimated value (aposteriori)", "True value"])
     axs[0].set_ylim(-0.60, 1.60)    
@@ -126,9 +134,6 @@ def iterate_and_plot(wave, kalman_filter, charge_measurement_noise):
     # Iterate through the input wave:
     for i, x in enumerate(wave.signal_noise):
         
-        if i == 0: 
-            continue
-        
         # The virtual charge measurement emulates the task consumption measured by Joulescope.
         # virtual charge measurement = new wave value - previous wave value + noise.
         charge_measurement = np.random.normal(wave.waveform[i] - previous_x, charge_measurement_noise)
@@ -141,8 +146,6 @@ def iterate_and_plot(wave, kalman_filter, charge_measurement_noise):
         
         # KALMAN PREDICT
         # In this case the x is soc evaluation based on the ECM model and OCV-SOC evaluation.
-        kalman_filter.update(x)
-        
         x_aposteriori = kalman_filter.update(x)
         filtered_values1[i] = x_aposteriori
         K_values1[i] = kalman_filter.K_gain
@@ -179,9 +182,9 @@ ax_radio =                    plt.axes([widget_start_x + widget_witdh + 0.05, wi
 replot_button = Button(ax_plot_button, 'Plot')
 replot_button = Button(ax_plot_button, 'Plot')
 meas_noise_slider =    Slider(ax_std_dev, 'Absolute noise (voltage)', 0, 3, valinit=measure_noise_global)
-process_noise_slider = Slider(ax_process_noise, 'Process noise', 0, 3, valinit=process_noise_global)
-cum_noise_slider =     Slider(ax_cumulative_measure_noise, 'Differential noise (charge)', 0, 3, valinit=doprinos_noise_global)
-radio = RadioButtons(ax_radio, ('No update', 'Update volt. meas noise', 'Update charge. meas noise', 'Both'))
+process_noise_slider = Slider(ax_process_noise, 'Process noise', 0, 0.1, valinit=process_noise_global)
+cum_noise_slider =     Slider(ax_cumulative_measure_noise, 'Differential noise (charge)', 0, 0.1, valinit=doprinos_noise_global)
+radio = RadioButtons(ax_radio, ('Both', 'Update volt. meas noise', 'Update charge. meas noise', 'No update'))
 
 
 #Slider callback functions

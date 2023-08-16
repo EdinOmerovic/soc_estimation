@@ -8,7 +8,9 @@ import numpy as np
 
 class KalmanSoC():
     def __init__(self, dt, init_proc_uncern, init_meas_uncern, init_x, init_uncern):
-        self.dt = dt        
+        self.dt = dt     
+        self.init_x = init_x
+        self.init_uncern = init_uncern
         # State transition matrix determines how the state is going to evolve in time (by itself).
         self.A = 1 # In our case we use constant unit matrix because we suppose that the state won't change by itself if not provoked. 
         #self.A = np.matrix([[1, self.dt, 0.5*self.dt**2],
@@ -34,11 +36,8 @@ class KalmanSoC():
         
         # Initial state uncertainty. The uncertainty of the initial guess.
         self.P = init_uncern  
-        
-        
         # Initial state estimation
         self.x = init_x
-        
         # Kalman gain
         self.K_gain = 1
          
@@ -69,3 +68,10 @@ class KalmanSoC():
         self.P = (1 - self.K_gain *self.C)*self.P
         
         return self.x
+    
+    def reset(self):
+        self.P = self.init_uncern  
+        # Initial state estimation
+        self.x = self.init_x
+        # Kalman gain
+        self.K_gain = 1
