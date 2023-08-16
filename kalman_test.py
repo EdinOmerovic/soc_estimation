@@ -11,16 +11,16 @@ from kalman_filter2d import KalmanFilter2D
 from kalman_matrix import KalmanMatrix
 from kalman_soc import KalmanSoC
 
-# Wave parameters:
+# Wave duration and size parameters:
 T_START = 0
 T_STOP = 5
 N_POINTS = 500
 TIME_STEP = (T_STOP - T_START)/N_POINTS
-# NOISE values
-initial_measure_noise = 2
-initial_process_noise = 0.01
-initial_doprinos_noise = 0.05
-doprinos_noise = initial_doprinos_noise
+
+# Initial noise values
+measure_noise = 2
+process_noise = 0.01
+doprinos_noise = 0.05
 
 # SIGNAL GENERATION
 T_wave = 2  # Time period
@@ -30,32 +30,39 @@ t = np.linspace(T_START, T_STOP, N_POINTS, endpoint=False)
 # Generate the sawtooth wave
 triangle_wave= SIGNAL_AMPLITUDE*signal.sawtooth(2 * np.pi * 1/T_wave * t, 0.5)
 sine_wave = SIGNAL_AMPLITUDE*np.sin(2 * np.pi * 1/T_wave * t)
+
 # Wave initialization
 wave = Wave(triangle_wave)
 bias = 2.5*(signal.sawtooth(2 * np.pi * 2/T_STOP * t, 0.5) + 1)
-wave.add_noise(initial_measure_noise)
+wave.add_noise(measure_noise)
 #wave.add_bias(bias)
 
 
-def slider_update_noise(slider_var):
+#def update sliders
+
+def update_sliders(slider_var):
     # Get slider values:
-    std_dev_slider = slider_std_dev.val
-    doprinos_noise = cumulative_measure_noise.val
-    #kalman_filter.measurement_noise = std_dev_slider
-    kalman_filter.Q_meas_uncern = std_dev_slider
-    noisy_measurements = wave.add_noise(std_dev_slider)
+    global measure_noise, doprinos_noise, process_noise 
+    measure_noise = meas_noise_slider.val
+    doprinos_noise = cum_noise_slider.val
+    process_noise = process_noise_slider.val
+    #kalman_filter.measurement_noise = slider_std_dev.val
+    
+    
+    # TODO: add as an option not to update it in the kalman gain. 
+    kalman_filter.Q_meas_uncern = measure_noise
+    noisy_measurements = wave.add_noise(measure_noise)
+    
     
     # Get all plots from first subplot
     plots = axs[0].get_lines()    
     plots[0].set_ydata(noisy_measurements)
     
-    iterate_and_plot(wave, kalman_filter, doprinos_noise)
-    fig.canvas.draw_idle()
-    plt.show()
-
-def slider_update_process_noise(slider_var):
-    #kalman_filter.process_noise = slider_process_noise.val
-    kalman_filter.P = slider_process_noise.val
+    # FIXME: ovo je sumnjivo, da li se treba mijenjati trenutna vrijednost nesigurnosti?
+    #kalman_filter.P = process_noise_slider.val
+    kalman_filter.R_proc_uncern = process_noise_slider.val
+    
+    
     iterate_and_plot(wave, kalman_filter, doprinos_noise)
     fig.canvas.draw_idle()
     plt.show()
@@ -80,7 +87,7 @@ def plot_values(axs, *argv):
     # Second plot is for the filter internal coefficients
     axs[1].plot(t, argv[1])
     axs[1].legend(["Kalman gain"])
-    title.set_text(f"meas noise = {kalman_filter.Q_meas_uncern}, process noise = {kalman_filter.R_proc_uncern}, cumulative measure noise = {doprinos_noise}")
+    title.set_text(f"meas noise = {measure_noise}, process noise = {process_noise}, cumulative measure noise = {doprinos_noise}")
     plt.show()
 
 
@@ -116,22 +123,23 @@ def iterate_and_plot(wave, kalman_filter, charge_measurement_noise):
 
 # Create an empty canvas for subplots and sliders
 fig, axs = plt.subplots(2, 1, figsize=(6, 9))
-# Create sliders for mean and standard deviation
+title = plt.suptitle(t='', fontsize = 12)
+
+# Create space for sliders 
 plt.subplots_adjust(bottom=0.25)
-ax_cumulative_measure_noise = plt.axes([0.15, 0.15, 0.65, 0.03], facecolor='lightgoldenrodyellow')
-ax_process_noise = plt.axes([0.15, 0.1, 0.65, 0.03], facecolor='lightgoldenrodyellow')
+# Create sliders for mean and standard deviation
 ax_std_dev = plt.axes([0.15, 0.05, 0.65, 0.03], facecolor='lightgoldenrodyellow')
-title = plt.suptitle(t='', fontsize = 20)
-
-slider_process_noise = Slider(ax_process_noise, 'Process noise', 0, 3, valinit=initial_process_noise)
-slider_std_dev = Slider(ax_std_dev, 'Std Dev', 0, 10, valinit=initial_measure_noise)
-cumulative_measure_noise = Slider(ax_cumulative_measure_noise, 'Cumulative noise', 0, 3, valinit=initial_doprinos_noise)
+ax_process_noise = plt.axes([0.15, 0.1, 0.65, 0.03], facecolor='lightgoldenrodyellow')
+ax_cumulative_measure_noise = plt.axes([0.15, 0.15, 0.65, 0.03], facecolor='lightgoldenrodyellow')
 
 
+process_noise_slider = Slider(ax_process_noise, 'Process noise', 0, 5, valinit=process_noise)
+meas_noise_slider = Slider(ax_std_dev, 'Std Dev', 0, 5, valinit=measure_noise)
+cum_noise_slider = Slider(ax_cumulative_measure_noise, 'Cumulative noise', 0, 5, valinit=doprinos_noise)
 #Slider callback functions
-slider_process_noise.on_changed(slider_update_process_noise)
-slider_std_dev.on_changed(slider_update_noise)
-cumulative_measure_noise.on_changed(slider_update_noise)
+process_noise_slider.on_changed(update_sliders)
+meas_noise_slider.on_changed(update_sliders)
+cum_noise_slider.on_changed(update_sliders)
 
 
 
@@ -148,9 +156,9 @@ if __name__ == "__main__":
     #kalman_filter = Kalman(init_x, init_x1, init_p, init_p1, initial_measure_noise, initial_measure_noise)
     #kalman_filter2d = KalmanFilter2D(TIME_STEP, 0.1, 1.25, 1.25)
     #kalman_filterMat = KalmanMatrix(TIME_STEP, initial_process_noise, initial_measure_noise)
-    kalman_filter = KalmanSoC(TIME_STEP, initial_process_noise, initial_measure_noise)
+    kalman_filter = KalmanSoC(TIME_STEP, process_noise, measure_noise)
     
-    iterate_and_plot(wave, kalman_filter, initial_doprinos_noise)
+    iterate_and_plot(wave, kalman_filter, doprinos_noise)
         
     
     
