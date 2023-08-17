@@ -145,7 +145,12 @@ if __name__ == "__main__":
         datareader = csv.reader(csvfile)
         num_elements = sum(1 for row in datareader) 
     
-    true_charge_values1 = true_charge_values2 = appriori_values = aposteriori_values =true_time1_values = true_time2_values = [None]*num_elements
+    true_charge_values1 = [None]*num_elements
+    true_charge_values2 = [None]*num_elements
+    appriori_values = [None]*num_elements
+    aposteriori_values = [None]*num_elements
+    true_time1_values = [None]*num_elements
+    true_time2_values = [None]*num_elements
         
     # Read the .csv containing the data made by power supply
     with open(power_supply_filename, 'r') as csvfile:
@@ -166,7 +171,7 @@ if __name__ == "__main__":
             
             soc_algoritm.before_task(sleep_charge, sleep_charge_uncert, soc_from_v1, soc_from_v1_uncert)
             appriori_values[i] = soc_algoritm.aposteriori1
-            true_charge_values1[i] = get_charge_from_jls(before_pulse_time)/float(BATTERY_CAPACITY)
+            true_charge_values1[i] = 1 - get_charge_from_jls(before_pulse_time)/float(BATTERY_CAPACITY)
             true_time1_values[i] = before_pulse_time
             
             # @ TIME 2
@@ -181,17 +186,18 @@ if __name__ == "__main__":
             soc_algoritm.after_task(active_charge, active_charge_uncert, soc_from_v2, soc_from_v2_uncert)
             aposteriori_values[i] = soc_algoritm.aposteriori2
             # aprox. Actual charge readings during this time.
-            true_charge_values2[i] = get_charge_from_jls(after_pulse_time)/BATTERY_CAPACITY
-            true_time2_values = after_pulse_time
-            print(true_charge_values2[i])
+            true_charge_values2[i] = 1 - get_charge_from_jls(after_pulse_time)/BATTERY_CAPACITY
+            true_time2_values[i] = after_pulse_time
+            
+            print(f"{appriori_values[i]}, {true_charge_values1[i]}, {true_time1_values[i]}| {aposteriori_values[i]},{true_charge_values2[i]},{true_time2_values[i]}")
         
         # After iterating through the csv file, plot all of the values
         # Create an empty canvas for subplots and sliders
         fig, axs = plt.subplots(2, 1, figsize=(18, 9))
         title = plt.suptitle(t='', fontsize = 12)
         axs[0].plot(true_time1_values, appriori_values, "oy") #Estimate before the task
-        axs[0].plot(true_time1_values, true_charge_values1, "oy") #Estimate before the task
+        axs[0].plot(true_time1_values, true_charge_values1,) #Estimate before the task
         
-        axs[1].plot(true_time2_values, aposteriori_values) # Estimate after the task
+        axs[1].plot(true_time2_values, aposteriori_values, "oy") # Estimate after the task
         axs[1].plot(true_time2_values, true_charge_values2) # Estimate after the task
         plt.show()
