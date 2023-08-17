@@ -98,7 +98,7 @@ def interpolate(x, array):
 
 def soc_from_vbat_rising(v_bat):
     #Based on the ECM model this should return the SOC based on the voltage measurement BEFORE the task
-    return interpolate(v_bat + 0.22, SOC_FROM_VBAT)#TODO: add SoC estimate from the Voc obtained from the ECM model
+    return interpolate(v_bat + 0.23, SOC_FROM_VBAT)#TODO: add SoC estimate from the Voc obtained from the ECM model
     
     
 def soc_from_vbat_falling(v_bat):
@@ -169,7 +169,7 @@ if __name__ == "__main__":
             sleep_charge_uncert = 0.5
             # It can take a battery voltage measurement
             soc_from_v1 = soc_from_vbat_rising(V1)
-            soc_from_v1_uncert = 0.3
+            soc_from_v1_uncert = 0.1
             
             soc_algoritm.before_task(sleep_charge, sleep_charge_uncert, soc_from_v1, soc_from_v1_uncert)
             appriori_values[i] = soc_algoritm.aposteriori1
