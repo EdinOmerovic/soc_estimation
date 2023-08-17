@@ -94,11 +94,9 @@ def get_mse(true, actual):
 
 def plot_values(axs, *argv):
     assert len(argv) == len(axs)
-    
     #Delete any previous plots
     for a in axs:
         a.cla()
-    
     
     # First plot is for time plots of the signals
     mean_square_error = get_mse(argv[0][0], argv[0][1])  
@@ -125,8 +123,8 @@ def plot_values(axs, *argv):
 def iterate_and_plot(wave, kalman_filter, charge_measurement_noise):
     #Initialize all lists to be used for storing the values to be plotted
     
-    filtered_values = [None]*len(wave.signal_noise)
-    filtered_values1 = [None]*len(wave.signal_noise)
+    appriori_values = [None]*len(wave.signal_noise)
+    aposteriori_values = [None]*len(wave.signal_noise)
     K_values = [None]*len(wave.signal_noise)
     K_values1 = [None]*len(wave.signal_noise)
     
@@ -141,20 +139,21 @@ def iterate_and_plot(wave, kalman_filter, charge_measurement_noise):
         
         
         # Store the values in the list to be plotted
-        filtered_values[i] = x_apriori
+        appriori_values[i] = x_apriori
         K_values[i] = kalman_filter.K_gain
         
         # KALMAN PREDICT
         # In this case the x is soc evaluation based on the ECM model and OCV-SOC evaluation.
         x_aposteriori = kalman_filter.update(x)
-        filtered_values1[i] = x_aposteriori
+        
+        aposteriori_values[i] = x_aposteriori
         K_values1[i] = kalman_filter.K_gain
         
         
         previous_x = wave.waveform[i]
         
     # Plot the wave    
-    plot_values(axs, (wave.signal_noise, filtered_values, filtered_values1, wave.waveform), (K_values, K_values1))
+    plot_values(axs, (wave.signal_noise, appriori_values, aposteriori_values, wave.waveform), (K_values, K_values1))
 
 
 
