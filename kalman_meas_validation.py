@@ -36,7 +36,7 @@ SOC_FROM_VBAT = [
 # Initial guess
 init_x = 1
 # Uncertainty of the initial guess
-init_p = 1
+init_p = 0.01
 
 kalman_process_noise = process_noise_global
 kalman_measure_noise = measure_noise_global
@@ -53,18 +53,20 @@ class Algorithm:
     def before_task(self, sleep_charge, sleep_charge_uncert, soc_from_v1, soc_from_v1_uncert):
         # Estimated charge measurements during sleep
         self.kalman_filter.R_proc_uncern = sleep_charge_uncert
+        self.kalman_filter.Q_meas_uncern = soc_from_v1_uncert 
+        
         self.kalman_filter.predict(sleep_charge)
         # Voltage measurement before the pulse
-        self.kalman_filter.Q_meas_uncern = soc_from_v1_uncert
         self.aposteriori1 = self.kalman_filter.update(soc_from_v1)
         
     def after_task(self, active_charge, active_charge_uncert, soc_from_v2, soc_from_v2_uncert):
         # Estimated charge measurements during active period
         self.kalman_filter.R_proc_uncern = active_charge_uncert
+        self.kalman_filter.Q_meas_uncern = soc_from_v2_uncert
+        
         self.kalman_filter.predict(active_charge)
         # Voltage measurement before the pulse
-        self.kalman_filter.Q_meas_uncern = soc_from_v2_uncert
-        self.aposteriori1 = self.kalman_filter.update(soc_from_v2)
+        self.aposteriori2 = self.kalman_filter.update(soc_from_v2)
 
 def get_effective_charge(current, charge, coefs):
     return current*charge
@@ -96,12 +98,12 @@ def interpolate(x, array):
 
 def soc_from_vbat_rising(v_bat):
     #Based on the ECM model this should return the SOC based on the voltage measurement BEFORE the task
-    return interpolate(v_bat, SOC_FROM_VBAT) #TODO: add SoC estimate from the Voc obtained from the ECM model
+    return interpolate(v_bat + 0.22, SOC_FROM_VBAT)#TODO: add SoC estimate from the Voc obtained from the ECM model
     
     
 def soc_from_vbat_falling(v_bat):
     #Based on the ECM model this should return the SOC based on the voltage measurement AFTER the task
-    return interpolate(v_bat, SOC_FROM_VBAT) #TODO: add SoC estimate from the Voc obtained from the ECM model
+    return interpolate(v_bat + 0.4, SOC_FROM_VBAT) #TODO: add SoC estimate from the Voc obtained from the ECM model
 
 
 def get_charge_from_jls(time_since_start):
@@ -164,10 +166,10 @@ if __name__ == "__main__":
             # When the MCU wakes up, it has an idea of how much energy it spent in the sleep mode.
             # Difference in SoC due to sleep period
             sleep_charge = 0
-            sleep_charge_uncert = 1
+            sleep_charge_uncert = 0.5
             # It can take a battery voltage measurement
             soc_from_v1 = soc_from_vbat_rising(V1)
-            soc_from_v1_uncert = 1
+            soc_from_v1_uncert = 0.3
             
             soc_algoritm.before_task(sleep_charge, sleep_charge_uncert, soc_from_v1, soc_from_v1_uncert)
             appriori_values[i] = soc_algoritm.aposteriori1
@@ -177,12 +179,13 @@ if __name__ == "__main__":
             # @ TIME 2
             after_pulse_time = get_seconds(experiment_start, date2)
             # Later, the microcontroler executes a certain task, and spends some of battery state of charge.  
-            active_charge = -1 * get_effective_charge(current, duration, 1)/BATTERY_CAPACITY
-            active_charge_uncert = 0.01
+            active_charge = get_effective_charge(current, duration, 1)/float(BATTERY_CAPACITY)
+            active_charge_uncert = 0.000001
             
             # Finally,  it measures the voltage again and goes back to sleep. 
             soc_from_v2 = soc_from_vbat_falling(V2)
             soc_from_v2_uncert = 1
+            print(active_charge)
             soc_algoritm.after_task(active_charge, active_charge_uncert, soc_from_v2, soc_from_v2_uncert)
             aposteriori_values[i] = soc_algoritm.aposteriori2
             # aprox. Actual charge readings during this time.
