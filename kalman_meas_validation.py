@@ -108,14 +108,28 @@ def get_charge_from_jls(time_since_start):
     # Open the a file made by Joulescope, search for the index with time specified.
     with open(ground_truth_filename, 'r') as file:
         reader = csv.reader(file)
-        for i, row1 in enumerate(reader):
-            if i == 0: 
-                continue #Skip the first header row
+        start = 0
+        end = file.seek(0, 2)
+        file.seek(0)
+        
+        while start <= end:
+            mid = (start + end) // 2
+            file.seek(mid)
+            file.readline()
             
-            if float(row1[0]) == round(time_since_start):
+            line = file.readline() # Read the next full line
+            row1 = line.strip().split(",") # Assuming CSV is comma-delimited
+            
+            index = float(row1[0])
+            
+            if index == round(time_since_start):
                 return float(row1[4])
-
-        return None
+            elif index < round(time_since_start):
+                start = file.tell()
+            else:
+                end = mid - 1
+                
+        return float(row1[4])
 
 def get_seconds(date1_str, date2_str):
     time_diff = datetime.strptime(date2_str, "%Y-%m-%d %H:%M:%S.%f") - datetime.strptime(date1_str, "%Y-%m-%d %H:%M:%S.%f")
@@ -131,7 +145,7 @@ if __name__ == "__main__":
         datareader = csv.reader(csvfile)
         num_elements = sum(1 for row in datareader) 
     
-    true_charge_values1, true_charge_values2, appriori_values, aposteriori_values,true_time1_values,true_time2_values = [None]*num_elements
+    true_charge_values1 = true_charge_values2 = appriori_values = aposteriori_values =true_time1_values = true_time2_values = [None]*num_elements
         
     # Read the .csv containing the data made by power supply
     with open(power_supply_filename, 'r') as csvfile:
@@ -169,7 +183,7 @@ if __name__ == "__main__":
             # aprox. Actual charge readings during this time.
             true_charge_values2[i] = get_charge_from_jls(after_pulse_time)/BATTERY_CAPACITY
             true_time2_values = after_pulse_time
-        
+            print(true_charge_values2[i])
         
         # After iterating through the csv file, plot all of the values
         # Create an empty canvas for subplots and sliders
