@@ -1,22 +1,31 @@
+import re
+import itertools
 import csv
-from kalman_soc import KalmanSoC
-from pathlib import Path
-from datetime import datetime
+import numpy as np
 import matplotlib.pyplot as plt
+
+from datetime import datetime
+from statistics import mean 
+
+import os
+
+from kalman_soc import KalmanSoC
 
 ground_truth_filename = "unified_20220430_113319_adjusted_time.csv"
 power_supply_filename = "output_validation_discharge.csv"
-
+ground_truth_cache_filename = "ground_truth_cache.csv"
 
 
 experiment_start = "2022-04-30 11:34:02.094441"
 
-# Initial noise values
-measure_noise_global = 0.25
-process_noise_global = 0.0001
-doprinos_noise_global = 0.005
-TIME_STEP = 0 #FIXME
 
+sleep_charge = 0
+sleep_charge_uncert = 0.001
+soc_from_v1_uncert = 0.15
+
+
+active_charge_uncert = 0
+soc_from_v2_uncert = 0.35
 
 
 #SoC(Voc_bat) obtained from nominal discharge curve
@@ -38,35 +47,41 @@ init_x = 1
 # Uncertainty of the initial guess
 init_p = 0.01
 
-kalman_process_noise = process_noise_global
-kalman_measure_noise = measure_noise_global
 BATTERY_CAPACITY = 12 #Coulomb hours
 
+gt_count = 0
+with open(ground_truth_filename) as fp:
+    for (gt_count, _) in enumerate(fp, 1):
+        pass
 
 class Algorithm:
     def __init__(self, init_value):
-        self.kalman_filter = KalmanSoC(TIME_STEP, kalman_process_noise, kalman_measure_noise, init_x, init_p)
+        self.kalman_filter1 = KalmanSoC(sleep_charge_uncert, soc_from_v1_uncert, init_value, init_p)
+        self.kalman_filter2 = KalmanSoC(active_charge_uncert, soc_from_v2_uncert, init_value, init_p)
         self.init_value = init_value
         self.aposteriori1 = init_value
         self.aposteriori2 = init_value
     
     def before_task(self, sleep_charge, sleep_charge_uncert, soc_from_v1, soc_from_v1_uncert):
         # Estimated charge measurements during sleep
-        self.kalman_filter.R_proc_uncern = sleep_charge_uncert
-        self.kalman_filter.Q_meas_uncern = soc_from_v1_uncert 
+        #self.kalman_filter.R_proc_uncern = sleep_charge_uncert
+        #self.kalman_filter.Q_meas_uncern = soc_from_v1_uncert 
         
-        self.kalman_filter.predict(sleep_charge)
+        self.kalman_filter1.predict(sleep_charge)
         # Voltage measurement before the pulse
-        self.aposteriori1 = self.kalman_filter.update(soc_from_v1)
+        self.aposteriori1 = self.kalman_filter1.update(soc_from_v1)
         
     def after_task(self, active_charge, active_charge_uncert, soc_from_v2, soc_from_v2_uncert):
         # Estimated charge measurements during active period
-        self.kalman_filter.R_proc_uncern = active_charge_uncert
-        self.kalman_filter.Q_meas_uncern = soc_from_v2_uncert
+        #self.kalman_filter.R_proc_uncern = active_charge_uncert
+        #self.kalman_filter.Q_meas_uncern = soc_from_v2_uncert
         
-        self.kalman_filter.predict(active_charge)
+        self.kalman_filter2.predict(active_charge)
         # Voltage measurement before the pulse
-        self.aposteriori2 = self.kalman_filter.update(soc_from_v2)
+        self.aposteriori2 = self.kalman_filter2.update(soc_from_v2)
+        self.kalman_filter2.x = mean([self.aposteriori1, self.aposteriori2])
+
+
 
 def get_effective_charge(current, charge, coefs):
     return current*charge
@@ -98,18 +113,64 @@ def interpolate(x, array):
 
 def soc_from_vbat_rising(v_bat):
     #Based on the ECM model this should return the SOC based on the voltage measurement BEFORE the task
-    return interpolate(v_bat + 0.23, SOC_FROM_VBAT)#TODO: add SoC estimate from the Voc obtained from the ECM model
+    return interpolate(v_bat + 0.24, SOC_FROM_VBAT)#TODO: add SoC estimate from the Voc obtained from the ECM model
     
     
 def soc_from_vbat_falling(v_bat):
     #Based on the ECM model this should return the SOC based on the voltage measurement AFTER the task
-    return interpolate(v_bat + 0.4, SOC_FROM_VBAT) #TODO: add SoC estimate from the Voc obtained from the ECM model
+    return interpolate(v_bat + 0.26, SOC_FROM_VBAT) #TODO: add SoC estimate from the Voc obtained from the ECM model
 
+def write_to_chache(ground_truth_cache_filename, row):
+    # Make a file which is used for cacheint values. 
+    # Create a chache file if it doesn't exist
+    with open(ground_truth_cache_filename, 'a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(row)
+        
 
+# The problem with this search is that it can't find an element sometimes. 
+def try_reading_cache(time_since_start):
+    if os.path.exists(ground_truth_cache_filename):         
+        with open(ground_truth_cache_filename, 'r') as cache_file:
+            start = 0   # First row in the .csv
+            end = cache_file.seek(0,2) # Last row in the .csv
+            cache_file.seek(0)
+            
+            while start <= end:
+                mid = (start + end) // 2
+                
+                cache_file.seek(mid)
+                cache_file.readline()
+                
+                line = cache_file.readline()
+                if line == '':
+                    break
+                row1 = line.strip().split(",")
+                
+                index = float(row1[0])
+                target_index = round(round(2*time_since_start)/2, 1)
+                
+                if index == target_index:
+                    # Return the cached value. 
+                    return float(row1[4])
+                elif index < target_index:
+                    start = cache_file.tell()
+                else:
+                    end = mid - 1
+    return None
+    
+'''
+    Obtain the accumulated charge in a certain time measured by Joulescope (ground truth) 
+'''
 def get_charge_from_jls(time_since_start):
-    # Open the a file made by Joulescope, search for the index with time specified.
+    # TRY READING IN CACHE: 
+    # cached_value = try_reading_cache(time_since_start)
+    # if cached_value != None:
+    #     return cached_value
+    
+    # NOTHING FOUND IN THE CACHE, GOING THROUGH THE WHOLE .csv file
+    row1 = None
     with open(ground_truth_filename, 'r') as file:
-        reader = csv.reader(file)
         start = 0
         end = file.seek(0, 2)
         file.seek(0)
@@ -123,21 +184,32 @@ def get_charge_from_jls(time_since_start):
             row1 = line.strip().split(",") # Assuming CSV is comma-delimited
             
             index = float(row1[0])
+            target_index = round(round(2*time_since_start)/2, 1) 
             
-            if index == round(time_since_start):
+            if index == target_index:
+                #print("Nasao i ubacio")
+                #write_to_chache(ground_truth_cache_filename, [float(x) for x in row1])
                 return float(row1[4])
             elif index < round(time_since_start):
                 start = file.tell()
             else:
                 end = mid - 1
-                
-        return float(row1[4])
+    
+    # The binary search haven't found that element. Giving our final best bet. 
+    return float(row1[4])
 
 def get_seconds(date1_str, date2_str):
     time_diff = datetime.strptime(date2_str, "%Y-%m-%d %H:%M:%S.%f") - datetime.strptime(date1_str, "%Y-%m-%d %H:%M:%S.%f")
     return time_diff.total_seconds()
+   
+if __name__ == "__main__":    
+    # Iterate through the pure SoC-Voc lookup table
+    v_bat_plot = np.linspace(SOC_FROM_VBAT[0][0], SOC_FROM_VBAT[-1][0], num=100)
+    soc_from_vbat_plot = [interpolate(x, SOC_FROM_VBAT) for i,x in enumerate(v_bat_plot)]
+    # Create a figure for that an plot it. 
+    plt.figure()
+    plt.plot(soc_from_vbat_plot[::-1], v_bat_plot) #Estimate before the task
     
-if __name__ == "__main__":
     # Initialize the high level algorithm
     soc_algoritm = Algorithm(1)
     
@@ -151,8 +223,11 @@ if __name__ == "__main__":
     true_charge_values2 = [None]*num_elements
     appriori_values = [None]*num_elements
     aposteriori_values = [None]*num_elements
+    pure_voltage_v1 = [None]*num_elements
+    pure_voltage_v2 = [None]*num_elements
     true_time1_values = [None]*num_elements
     true_time2_values = [None]*num_elements
+    average_values = [None]*num_elements
         
     # Read the .csv containing the data made by power supply
     with open(power_supply_filename, 'r') as csvfile:
@@ -165,29 +240,32 @@ if __name__ == "__main__":
             before_pulse_time = get_seconds(experiment_start, date1)
             # When the MCU wakes up, it has an idea of how much energy it spent in the sleep mode.
             # Difference in SoC due to sleep period
-            sleep_charge = 0
-            sleep_charge_uncert = 0.5
+
             # It can take a battery voltage measurement
             soc_from_v1 = soc_from_vbat_rising(V1)
-            soc_from_v1_uncert = 0.1
+
             
             soc_algoritm.before_task(sleep_charge, sleep_charge_uncert, soc_from_v1, soc_from_v1_uncert)
             appriori_values[i] = soc_algoritm.aposteriori1
             true_charge_values1[i] = 1 - get_charge_from_jls(before_pulse_time)/float(BATTERY_CAPACITY)
             true_time1_values[i] = before_pulse_time
+            pure_voltage_v1[i] = soc_from_v1 
             
             # @ TIME 2
             after_pulse_time = get_seconds(experiment_start, date2)
             # Later, the microcontroler executes a certain task, and spends some of battery state of charge.  
             active_charge = get_effective_charge(current, duration, 1)/float(BATTERY_CAPACITY)
-            active_charge_uncert = 0.000001
+
             
             # Finally,  it measures the voltage again and goes back to sleep. 
             soc_from_v2 = soc_from_vbat_falling(V2)
-            soc_from_v2_uncert = 1
+
             print(active_charge)
             soc_algoritm.after_task(active_charge, active_charge_uncert, soc_from_v2, soc_from_v2_uncert)
+            
+            
             aposteriori_values[i] = soc_algoritm.aposteriori2
+            pure_voltage_v2[i] = soc_from_v2 
             # aprox. Actual charge readings during this time.
             true_charge_values2[i] = 1 - get_charge_from_jls(after_pulse_time)/BATTERY_CAPACITY
             true_time2_values[i] = after_pulse_time
@@ -198,9 +276,13 @@ if __name__ == "__main__":
         # Create an empty canvas for subplots and sliders
         fig, axs = plt.subplots(2, 1, figsize=(18, 9))
         title = plt.suptitle(t='', fontsize = 12)
-        axs[0].plot(true_time1_values, appriori_values, "oy") #Estimate before the task
-        axs[0].plot(true_time1_values, true_charge_values1,) #Estimate before the task
+        axs[0].plot(true_time1_values, pure_voltage_v1, '0.7') #Estimate before the task
+        axs[0].plot(true_time1_values, appriori_values, "b") #Estimate before the task
+        #axs[0].plot(true_time1_values, average_values1) #Estimate before the task
+        axs[0].plot(true_time1_values, true_charge_values1, "g-") #Estimate before the task
         
-        axs[1].plot(true_time2_values, aposteriori_values, "oy") # Estimate after the task
-        axs[1].plot(true_time2_values, true_charge_values2) # Estimate after the task
+        axs[1].plot(true_time2_values, pure_voltage_v2, '0.7') # Estimate after the task
+        axs[1].plot(true_time2_values, aposteriori_values, "b") # Estimate after the task
+        #axs[1].plot(true_time2_values, average_values2) # Estimate after the task
+        axs[1].plot(true_time2_values, true_charge_values2, "g-") # Estimate after the task
         plt.show()
