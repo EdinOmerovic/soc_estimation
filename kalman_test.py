@@ -15,7 +15,7 @@ from kalman_soc import KalmanSoC
 # Wave duration and size parameters:
 T_START = 0
 T_STOP = 5
-N_POINTS = 500
+N_POINTS = 7500
 TIME_STEP = (T_STOP - T_START)/N_POINTS
 
 # Initial noise values
@@ -35,7 +35,7 @@ init_p = 1
 #kalman_filterMat = KalmanMatrix(TIME_STEP, initial_process_noise, initial_measure_noise)
 kalman_process_noise = process_noise_global
 kalman_measure_noise = measure_noise_global
-kalman_filter = KalmanSoC(TIME_STEP, kalman_process_noise, kalman_measure_noise, init_x, init_p)
+kalman_filter = KalmanSoC(kalman_process_noise, kalman_measure_noise, init_x, init_p)
 
 
 # SIGNAL GENERATION

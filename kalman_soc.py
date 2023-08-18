@@ -7,7 +7,7 @@ TODO: add the ability to modify the variances during the execution.
 import numpy as np
 
 class KalmanSoC():
-    def __init__(self, dt, init_proc_uncern, init_meas_uncern, init_x, init_uncern):
+    def __init__(self, init_proc_uncern, init_meas_uncern, init_x, init_uncern, dt=0):
         self.dt = dt     
         self.init_x = init_x
         self.init_uncern = init_uncern
