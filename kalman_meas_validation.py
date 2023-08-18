@@ -237,7 +237,7 @@ if __name__ == "__main__":
             current, duration, V1, V2, date1, date2 = parse_csv(row)
             
             # @ TIME 1
-            before_pulse_time = get_seconds(experiment_start, date1)
+            time_before_pulse = get_seconds(experiment_start, date1)
             # When the MCU wakes up, it has an idea of how much energy it spent in the sleep mode.
             # Difference in SoC due to sleep period
 
@@ -247,12 +247,12 @@ if __name__ == "__main__":
             
             soc_algoritm.before_task(sleep_charge, sleep_charge_uncert, soc_from_v1, soc_from_v1_uncert)
             appriori_values[i] = soc_algoritm.aposteriori1
-            true_charge_values1[i] = 1 - get_charge_from_jls(before_pulse_time)/float(BATTERY_CAPACITY)
-            true_time1_values[i] = before_pulse_time
+            true_charge_values1[i] = 1 - get_charge_from_jls(time_before_pulse)/float(BATTERY_CAPACITY)
+            true_time1_values[i] = time_before_pulse
             pure_voltage_v1[i] = soc_from_v1 
             
             # @ TIME 2
-            after_pulse_time = get_seconds(experiment_start, date2)
+            time_after_pulse = get_seconds(experiment_start, date2)
             # Later, the microcontroler executes a certain task, and spends some of battery state of charge.  
             active_charge = get_effective_charge(current, duration, 1)/float(BATTERY_CAPACITY)
 
@@ -267,8 +267,8 @@ if __name__ == "__main__":
             aposteriori_values[i] = soc_algoritm.aposteriori2
             pure_voltage_v2[i] = soc_from_v2 
             # aprox. Actual charge readings during this time.
-            true_charge_values2[i] = 1 - get_charge_from_jls(after_pulse_time)/BATTERY_CAPACITY
-            true_time2_values[i] = after_pulse_time
+            true_charge_values2[i] = 1 - get_charge_from_jls(time_after_pulse)/BATTERY_CAPACITY
+            true_time2_values[i] = time_after_pulse
             
             print(f"{appriori_values[i]}, {true_charge_values1[i]}, {true_time1_values[i]}| {aposteriori_values[i]},{true_charge_values2[i]},{true_time2_values[i]}")
         
