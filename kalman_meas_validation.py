@@ -20,17 +20,30 @@ experiment_start = "2022-04-30 11:34:02.094441"
 
 
 sleep_charge = 0
-sleep_charge_uncert = 0.001
-soc_from_v1_uncert = 0.15
+sleep_charge_uncert = 0.1
 
 
 active_charge_uncert = 0.0001
-soc_from_v2_uncert = 0.35
 
+voltage1_process_uncert = 0.15
+voltage2_process_uncert = 0.1
+V1_uncert = 0.1
+V2_uncert = 0.15
 
 #SoC(Voc_bat) obtained from nominal discharge curve
-SOC_FROM_VBAT = [
-        (2.33,	        0),
+SOC_FROM_VBAT = [(1.7, 0),
+                 (2, 0.1),
+                 (2.2, 0.13),
+                 (2.3, 0.165),
+                 (2.4, 0.276 + 0.1),
+                 (2.6, 0.8),
+                 (2.7, 0.929134),
+                 (2.8, 0.976378),
+                 (3, 1),
+]
+
+SOC_FROM_VBAT1 = [
+        (2.3,	        0),
         (2.437931034,	0.093396919),
         (2.495862069,	0.144666178),
         (2.559310345,	0.210139398),
@@ -41,9 +54,12 @@ SOC_FROM_VBAT = [
         (3        ,   1)
 ]
 
+VBAT_FROM_SOC = [(val[1], val[0]) for val in SOC_FROM_VBAT]
+
 # Setting up the initial conditions for the estimator
 # Initial guess
-init_x = 1
+init_soc = 1
+
 # Uncertainty of the initial guess
 init_p = 0.01
 
@@ -53,51 +69,9 @@ gt_count = 0
 with open(ground_truth_filename) as fp:
     for (gt_count, _) in enumerate(fp, 1):
         pass
-
-class Algorithm:
-    def __init__(self, init_value):
-        self.kalman_filter1 = KalmanSoC(sleep_charge_uncert, soc_from_v1_uncert, init_value, init_p)
-        self.kalman_filter2 = KalmanSoC(active_charge_uncert, soc_from_v2_uncert, init_value, init_p)
-        self.init_value = init_value
-        self.aposteriori1 = init_value
-        self.aposteriori2 = init_value
     
-    def before_task(self, sleep_charge, sleep_charge_uncert, soc_from_v1, soc_from_v1_uncert):
-        # Estimated charge measurements during sleep
-        #self.kalman_filter.R_proc_uncern = sleep_charge_uncert
-        #self.kalman_filter.Q_meas_uncern = soc_from_v1_uncert 
-        
-        self.kalman_filter1.predict(sleep_charge)
-        # Voltage measurement before the pulse
-        self.aposteriori1 = self.kalman_filter1.update(soc_from_v1)
-        
-    def after_task(self, active_charge, active_charge_uncert, soc_from_v2, soc_from_v2_uncert):
-        # Estimated charge measurements during active period
-        #self.kalman_filter.R_proc_uncern = active_charge_uncert
-        #self.kalman_filter.Q_meas_uncern = soc_from_v2_uncert
-        
-        self.kalman_filter2.predict(active_charge)
-        # Voltage measurement before the pulse
-        self.aposteriori2 = self.kalman_filter2.update(soc_from_v2)
-        self.kalman_filter2.x = mean([self.aposteriori1, self.aposteriori2])
-
-
-
-def get_effective_charge(current, charge, coefs):
-    return current*charge
-
-
-def parse_csv(row):
-    current = float(row[0])
-    pulse_duration = float(row[1])
-    pulse_start = row[2]
-    v1 = float(row[3])
-    pulse_end = row[4]
-    v2 = float(row[5])
-    return current, pulse_duration, v1, v2, pulse_start, pulse_end 
-
-
-
+    
+    
 #Linear interpolation
 def interpolate(x, array):
     if x < array[0][0]: return array[0][1]
@@ -113,12 +87,78 @@ def interpolate(x, array):
 
 def soc_from_vbat_rising(v_bat):
     #Based on the ECM model this should return the SOC based on the voltage measurement BEFORE the task
-    return interpolate(v_bat + 0.24, SOC_FROM_VBAT)#TODO: add SoC estimate from the Voc obtained from the ECM model
+    return interpolate(v_bat+0.034, SOC_FROM_VBAT)#TODO: add SoC estimate from the Voc obtained from the ECM model
     
     
 def soc_from_vbat_falling(v_bat):
     #Based on the ECM model this should return the SOC based on the voltage measurement AFTER the task
-    return interpolate(v_bat + 0.26, SOC_FROM_VBAT) #TODO: add SoC estimate from the Voc obtained from the ECM model
+    return interpolate(v_bat+0.034, SOC_FROM_VBAT) #TODO: add SoC estimate from the Voc obtained from the ECM model
+
+def get_effective_charge(current, charge, coefs):
+    return current*charge
+
+
+class Algorithm:
+    def __init__(self, init_value, init_p):
+        self.kalman_filter1 = KalmanSoC(sleep_charge_uncert, V1_uncert, init_value, init_p)
+        self.kalman_filter2 = KalmanSoC(active_charge_uncert, V2_uncert, init_value, init_p)
+        
+        self.voltage1_kalman =  KalmanSoC(voltage1_process_uncert, V1_uncert, interpolate(init_value, VBAT_FROM_SOC), init_p)
+        self.voltage2_kalman =  KalmanSoC(voltage2_process_uncert, V2_uncert, interpolate(init_value, VBAT_FROM_SOC), init_p)
+        
+        self.init_value = init_value
+        self.aposteriori1 = init_value
+        self.aposteriori2 = init_value
+    
+    def before_task(self, sleep_charge, sleep_charge_uncert, v1, v1_uncert):
+        # Estimated charge measurements during sleep
+        #self.kalman_filter.R_proc_uncern = sleep_charge_uncert
+        #self.kalman_filter.Q_meas_uncern = soc_from_v1_uncert 
+        
+        new_soc = self.kalman_filter1.predict(sleep_charge)
+        # Voltage measurement before the pulse
+        
+        # self.kalman_filter1.x ti je svakako vracen sa predictom.
+        voc_from_soc = interpolate(new_soc , VBAT_FROM_SOC)
+        
+        self.voltage1_kalman.predict(voc_from_soc - self.voltage1_kalman.x)
+        soc_form_vbat = interpolate(self.voltage1_kalman.update(v1 + 0.03), SOC_FROM_VBAT)
+        
+        self.aposteriori1 = self.kalman_filter1.update(soc_form_vbat)
+        
+    def after_task(self, active_charge, active_charge_uncert, v2, v2_uncert):
+        # Estimated charge measurements during active period
+        #self.kalman_filter.R_proc_uncern = active_charge_uncert
+        #self.kalman_filter.Q_meas_uncern = soc_from_v2_uncert
+        
+        
+        new_soc = self.kalman_filter2.predict(active_charge)
+        
+        voc_from_soc = interpolate(new_soc, VBAT_FROM_SOC)
+        self.voltage2_kalman.predict(voc_from_soc - self.voltage2_kalman.x)
+        
+        # od v2 mi bismo trebali dobiti ocv preko modela. 
+        soc_from_vbat = interpolate(self.voltage2_kalman.update(v2 + 0.03), SOC_FROM_VBAT)
+        
+        
+        # Voltage measurement before the pulse
+        self.aposteriori2 = self.kalman_filter2.update(soc_from_vbat)
+        #self.kalman_filter2.x = mean([self.aposteriori1, self.aposteriori2])
+
+
+
+
+
+def parse_csv(row):
+    current = float(row[0])
+    pulse_duration = float(row[1])
+    pulse_start = row[2]
+    v1 = float(row[3])
+    pulse_end = row[4]
+    v2 = float(row[5])
+    return current, pulse_duration, v1, v2, pulse_start, pulse_end 
+
+
 
 def write_to_chache(ground_truth_cache_filename, row):
     # Make a file which is used for cacheint values. 
@@ -211,7 +251,7 @@ if __name__ == "__main__":
     plt.plot(soc_from_vbat_plot[::-1], v_bat_plot) #Estimate before the task
     
     # Initialize the high level algorithm
-    soc_algoritm = Algorithm(1)
+    soc_algoritm = Algorithm(init_soc, init_p)
     
     
     # Read the .csv to see how many rows there is.
@@ -240,33 +280,25 @@ if __name__ == "__main__":
             time_before_pulse = get_seconds(experiment_start, date1)
             # When the MCU wakes up, it has an idea of how much energy it spent in the sleep mode.
             # Difference in SoC due to sleep period
-
-            # It can take a battery voltage measurement
-            soc_from_v1 = soc_from_vbat_rising(V1)
-
             
-            soc_algoritm.before_task(sleep_charge, sleep_charge_uncert, soc_from_v1, soc_from_v1_uncert)
+            soc_algoritm.before_task(sleep_charge, sleep_charge_uncert, V1, V1_uncert)
+            
+            
             appriori_values[i] = soc_algoritm.aposteriori1
             true_charge_values1[i] = 1 - get_charge_from_jls(time_before_pulse)/float(BATTERY_CAPACITY)
             true_time1_values[i] = time_before_pulse
-            pure_voltage_v1[i] = soc_from_v1 
+            pure_voltage_v1[i] = soc_from_vbat_rising(V1) 
             
             # @ TIME 2
             time_after_pulse = get_seconds(experiment_start, date2)
             # Later, the microcontroler executes a certain task, and spends some of battery state of charge.  
             active_charge = get_effective_charge(current, duration, 1)/float(BATTERY_CAPACITY)
 
-            
-            # Finally,  it measures the voltage again and goes back to sleep. 
-            soc_from_v2 = soc_from_vbat_falling(V2)
-
-            print(active_charge)
-            soc_algoritm.after_task(active_charge, active_charge_uncert, soc_from_v2, soc_from_v2_uncert)
+            soc_algoritm.after_task(active_charge, active_charge_uncert, V2, V2_uncert)
             
             
             aposteriori_values[i] = soc_algoritm.aposteriori2
-            pure_voltage_v2[i] = soc_from_v2 
-            # aprox. Actual charge readings during this time.
+            pure_voltage_v2[i] = soc_from_vbat_falling(V2)
             true_charge_values2[i] = 1 - get_charge_from_jls(time_after_pulse)/BATTERY_CAPACITY
             true_time2_values[i] = time_after_pulse
             
