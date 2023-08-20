@@ -22,13 +22,17 @@ experiment_start = "2022-04-30 11:34:02.094441"
 sleep_charge = 0
 sleep_charge_uncert = 0.1
 
-
-active_charge_uncert = 0.0001
+active_charge_uncert = 0.00001
 
 voltage1_process_uncert = 0.15
-voltage2_process_uncert = 0.05
-V1_uncert = 0.15
-V2_uncert = 0.15
+voltage2_process_uncert = 0.08
+
+V1_uncert = 0.2
+V2_uncert = 0.25
+
+
+NOMINAL_CURRENT = 100e-6
+P_CONF = 1.15
 
 #SoC(Voc_bat) obtained from nominal discharge curve
 SOC_FROM_VBAT = [(1.7, 0),
@@ -71,7 +75,7 @@ SOC_FROM_VBAT = [
     (2.1, 0.0021227684030324934),
     (2.2117241379310344, 0.020963560772805145),
         #(2.3,	        0),
-        (2.437931034,	0.093396919),
+        (2.437931034,	0.100000000),
         (2.495862069,	0.144666178),
         (2.559310345,	0.210139398),
         (2.622758621,	0.328804109),
@@ -121,8 +125,12 @@ def soc_from_vbat_falling(v_bat):
     #Based on the ECM model this should return the SOC based on the voltage measurement AFTER the task
     return interpolate(v_bat+0.25, SOC_FROM_VBAT) #TODO: add SoC estimate from the Voc obtained from the ECM model
 
-def get_effective_charge(current, charge, coefs):
-    return current*charge
+def get_effective_charge(current, duration, coefs):
+    # Effective charge is ony employed when we're discharging the battery. 
+    if current < 0:
+        current = abs(current)
+        return -1*(current*(current/NOMINAL_CURRENT)**(P_CONF-1))*duration
+    return current*duration
 
 def ocv_from_vbat(vbat):
     return vbat + 0.25
@@ -342,7 +350,7 @@ if __name__ == "__main__":
         voltage2_mse = sum((100*(x1-x2))**2 for x1, x2 in zip(true_charge_values1, pure_voltage_v2))/num_elements
         
         
-        title = plt.suptitle(t=f"Voltage-based MSE: {voltage1_mse} | Kalman filter MSE: {kalman2_mse} \n Voltage-based MSE: {voltage2_mse} | Kalman filter MSE: {kalman2_mse}", fontsize = 12)
+        title = plt.suptitle(t=f"Voltage-based MSE: {voltage1_mse} | Kalman filter MSE: {kalman1_mse} \n Voltage-based MSE: {voltage2_mse} | Kalman filter MSE: {kalman2_mse}", fontsize = 12)
         
         axs[0].plot(true_time1_values, pure_voltage_v1, '0.7') #Estimate before the task
         axs[0].plot(true_time1_values, appriori_values, "b") #Estimate before the task
