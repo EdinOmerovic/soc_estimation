@@ -26,8 +26,8 @@ sleep_charge_uncert = 0.1
 active_charge_uncert = 0.0001
 
 voltage1_process_uncert = 0.15
-voltage2_process_uncert = 0.1
-V1_uncert = 0.1
+voltage2_process_uncert = 0.05
+V1_uncert = 0.15
 V2_uncert = 0.15
 
 #SoC(Voc_bat) obtained from nominal discharge curve
@@ -41,6 +41,30 @@ SOC_FROM_VBAT = [(1.7, 0),
                  (2.8, 0.976378),
                  (3, 1),
 ]
+
+
+
+
+
+SOC_FROM_VBAT = [
+    (2.0986206896551725, 0),
+    (2.1, 0.0021227684030324934),
+    (2.2117241379310344, 0.020963560772805145),
+    (2.363448275862069, 0.053416483247737734),
+    (2.4379310344827587, 0.09339691856199561),
+    (2.4958620689655175, 0.14466617754952305),
+    (2.5593103448275865, 0.21013939838591333),
+    (2.6227586206896554, 0.3288041085840059),
+    (2.7193103448275866, 0.55680606505258),
+    (2.788275862068966, 0.7847101980924431),
+    (2.832413793103449, 0.9614624602592321),
+    (2.8600000000000003, 0.9771631205673759),
+    (2.898620689655173, 0.99006603081438),
+    (2.9648275862068973, 0.994556126192223),
+    (3.1, 1)
+]
+
+
 
 SOC_FROM_VBAT1 = [
         (2.3,	        0),
@@ -87,16 +111,18 @@ def interpolate(x, array):
 
 def soc_from_vbat_rising(v_bat):
     #Based on the ECM model this should return the SOC based on the voltage measurement BEFORE the task
-    return interpolate(v_bat+0.034, SOC_FROM_VBAT)#TODO: add SoC estimate from the Voc obtained from the ECM model
+    return interpolate(v_bat+0.25, SOC_FROM_VBAT)#TODO: add SoC estimate from the Voc obtained from the ECM model
     
     
 def soc_from_vbat_falling(v_bat):
     #Based on the ECM model this should return the SOC based on the voltage measurement AFTER the task
-    return interpolate(v_bat+0.034, SOC_FROM_VBAT) #TODO: add SoC estimate from the Voc obtained from the ECM model
+    return interpolate(v_bat+0.25, SOC_FROM_VBAT) #TODO: add SoC estimate from the Voc obtained from the ECM model
 
 def get_effective_charge(current, charge, coefs):
     return current*charge
 
+def ocv_from_vbat(vbat):
+    return vbat + 0.25
 
 class Algorithm:
     def __init__(self, init_value, init_p):
@@ -114,7 +140,7 @@ class Algorithm:
         # Estimated charge measurements during sleep
         #self.kalman_filter.R_proc_uncern = sleep_charge_uncert
         #self.kalman_filter.Q_meas_uncern = soc_from_v1_uncert 
-        
+        self.kalman_filter1.x = self.kalman_filter2.x
         new_soc = self.kalman_filter1.predict(sleep_charge)
         # Voltage measurement before the pulse
         
@@ -122,27 +148,25 @@ class Algorithm:
         voc_from_soc = interpolate(new_soc , VBAT_FROM_SOC)
         
         self.voltage1_kalman.predict(voc_from_soc - self.voltage1_kalman.x)
-        soc_form_vbat = interpolate(self.voltage1_kalman.update(v1 + 0.03), SOC_FROM_VBAT)
+        soc_form_vbat = interpolate(self.voltage1_kalman.update(ocv_from_vbat(v1)), SOC_FROM_VBAT)
         
-        self.aposteriori1 = self.kalman_filter1.update(soc_form_vbat)
+        self.aposteriori1 = self.kalman_filter1.update(soc_form_vbat + (self.kalman_filter2.x - self.kalman_filter1.x))
         
     def after_task(self, active_charge, active_charge_uncert, v2, v2_uncert):
         # Estimated charge measurements during active period
         #self.kalman_filter.R_proc_uncern = active_charge_uncert
         #self.kalman_filter.Q_meas_uncern = soc_from_v2_uncert
-        
-        
         new_soc = self.kalman_filter2.predict(active_charge)
         
         voc_from_soc = interpolate(new_soc, VBAT_FROM_SOC)
         self.voltage2_kalman.predict(voc_from_soc - self.voltage2_kalman.x)
         
         # od v2 mi bismo trebali dobiti ocv preko modela. 
-        soc_from_vbat = interpolate(self.voltage2_kalman.update(v2 + 0.03), SOC_FROM_VBAT)
+        soc_from_vbat = interpolate(self.voltage2_kalman.update(ocv_from_vbat(v2)), SOC_FROM_VBAT)
         
         
         # Voltage measurement before the pulse
-        self.aposteriori2 = self.kalman_filter2.update(soc_from_vbat)
+        self.aposteriori2 = self.kalman_filter2.update(mean([soc_from_vbat, self.kalman_filter1.x]))
         #self.kalman_filter2.x = mean([self.aposteriori1, self.aposteriori2])
 
 
