@@ -24,7 +24,7 @@ sleep_charge_uncert = 0.001
 soc_from_v1_uncert = 0.15
 
 
-active_charge_uncert = 0
+active_charge_uncert = 0.0001
 soc_from_v2_uncert = 0.35
 
 
@@ -275,7 +275,16 @@ if __name__ == "__main__":
         # After iterating through the csv file, plot all of the values
         # Create an empty canvas for subplots and sliders
         fig, axs = plt.subplots(2, 1, figsize=(18, 9))
-        title = plt.suptitle(t='', fontsize = 12)
+        
+        kalman1_mse = sum((100*(x1-x2))**2 for x1, x2 in zip(true_charge_values1, appriori_values))/num_elements
+        voltage1_mse = sum((100*(x1-x2))**2 for x1, x2 in zip(true_charge_values1, pure_voltage_v1))/num_elements
+        
+        kalman2_mse = sum((100*(x1-x2))**2 for x1, x2 in zip(true_charge_values1, aposteriori_values))/num_elements
+        voltage2_mse = sum((100*(x1-x2))**2 for x1, x2 in zip(true_charge_values1, pure_voltage_v2))/num_elements
+        
+        
+        title = plt.suptitle(t=f"Voltage-based MSE: {voltage1_mse} | Kalman filter MSE: {kalman2_mse} \n Voltage-based MSE: {voltage2_mse} | Kalman filter MSE: {kalman2_mse}", fontsize = 12)
+        
         axs[0].plot(true_time1_values, pure_voltage_v1, '0.7') #Estimate before the task
         axs[0].plot(true_time1_values, appriori_values, "b") #Estimate before the task
         #axs[0].plot(true_time1_values, average_values1) #Estimate before the task
