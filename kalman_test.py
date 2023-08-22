@@ -7,15 +7,15 @@ from matplotlib.widgets import Slider, Button, RadioButtons
 
 from wave import Wave
 # Kalman filter classes
-from kalman_filter import Kalman
-from kalman_filter2d import KalmanFilter2D
-from kalman_matrix import KalmanMatrix
+# from kalman_filter import Kalman
+# from kalman_filter2d import KalmanFilter2D
+# from kalman_matrix import KalmanMatrix
 from kalman_soc import KalmanSoC
 
 # Wave duration and size parameters:
 T_START = 0
 T_STOP = 5
-N_POINTS = 7500
+N_POINTS = 3000
 TIME_STEP = (T_STOP - T_START)/N_POINTS
 
 # Initial noise values
@@ -102,7 +102,7 @@ def plot_values(axs, *argv):
     mean_square_error = get_mse(argv[0][0], argv[0][1])  
     mean_square_error1 = get_mse(argv[0][0], argv[0][2])
     
-    axs[0].set_title(f'Estimation based on measurement. MSE ={mean_square_error}, MSE = {mean_square_error1}')
+    axs[0].set_title(f'Estimation based on measurement | Apri. MSE ={mean_square_error:.4f}, Apost. MSE = {mean_square_error1:.4f}')
     axs[0].plot(t, argv[0][0], "oy",) #Measured value
     axs[0].plot(t, argv[0][1], "0.5") #Estimated value
     axs[0].plot(t, argv[0][2], "b") # Actual value
@@ -116,11 +116,11 @@ def plot_values(axs, *argv):
     axs[1].plot(t, argv[1][0])
     axs[1].plot(t, argv[1][1])
     axs[1].legend(["Kalman gain"])
-    title.set_text(f"Actual: meas noise = {measure_noise_global}, process noise = {process_noise_global}, cumulative measure noise = {doprinos_noise_global} \n Kalman values: proc uncern = {kalman_filter.R_proc_uncern}, meas uncern = {kalman_filter.Q_meas_uncern} ")
+    title.set_text(f"Actual: meas noise = {measure_noise_global:.4f}, process noise = {process_noise_global:.4f}, cumulative measure noise = {doprinos_noise_global:.4f} \n Kalman values: proc uncern = {kalman_filter.R_proc_uncern:.4f}, meas uncern = {kalman_filter.Q_meas_uncern:.4f} ")
     plt.show()
 
 
-def iterate_and_plot(wave, kalman_filter, charge_measurement_noise):
+def iterate_and_plot(wave, kalman_filter, charge_measurement_noise_dev):
     #Initialize all lists to be used for storing the values to be plotted
     
     appriori_values = [None]*len(wave.signal_noise)
@@ -128,28 +128,26 @@ def iterate_and_plot(wave, kalman_filter, charge_measurement_noise):
     K_values = [None]*len(wave.signal_noise)
     K_values1 = [None]*len(wave.signal_noise)
     
+    # Iterate through the noised input wave:
     previous_x = wave.waveform[0]
-    # Iterate through the input wave:
     for i, x in enumerate(wave.signal_noise):
         
         # The virtual charge measurement emulates the task consumption measured by Joulescope.
         # virtual charge measurement = new wave value - previous wave value + noise.
-        charge_measurement = np.random.normal(wave.waveform[i] - previous_x, charge_measurement_noise)
+        charge_measurement = np.random.normal(wave.waveform[i] - previous_x, charge_measurement_noise_dev)
+        # Control update step: move the estimate based on the information about the charge.
         x_apriori = kalman_filter.predict(charge_measurement)
-        
         
         # Store the values in the list to be plotted
         appriori_values[i] = x_apriori
         K_values[i] = kalman_filter.K_gain
         
-        # KALMAN PREDICT
-        # In this case the x is soc evaluation based on the ECM model and OCV-SOC evaluation.
+        # Measurement update step: update the estimate based on the measurement 
+        # In this case the x is soc evaluation based on the OCV-SOC evaluation.
         x_aposteriori = kalman_filter.update(x)
         
         aposteriori_values[i] = x_aposteriori
         K_values1[i] = kalman_filter.K_gain
-        
-        
         previous_x = wave.waveform[i]
         
     # Plot the wave    
@@ -183,7 +181,7 @@ replot_button = Button(ax_plot_button, 'Plot')
 meas_noise_slider =    Slider(ax_std_dev, 'Absolute noise (voltage)', 0, 3, valinit=measure_noise_global)
 process_noise_slider = Slider(ax_process_noise, 'Process noise', 0, 0.1, valinit=process_noise_global)
 cum_noise_slider =     Slider(ax_cumulative_measure_noise, 'Differential noise (charge)', 0, 0.1, valinit=doprinos_noise_global)
-radio = RadioButtons(ax_radio, ('Both', 'Update volt. meas noise', 'Update charge. meas noise', 'No update'))
+radio = RadioButtons(ax_radio, ('Both', 'Volt. meas noise', 'Charge. meas noise', 'No update'))
 
 
 #Slider callback functions

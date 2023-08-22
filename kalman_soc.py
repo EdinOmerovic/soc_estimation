@@ -41,10 +41,8 @@ class KalmanSoC():
         # Kalman gain
         self.K_gain = 1
          
-        
     def predict(self, sys_input):
-        """ Update the state based on the system dynamics 
-        """
+        """ Control update step. """
         # Update the state based on previous state and input:
         self.x = self.A * self.x + self.B * sys_input
         # Calculate error covariance
@@ -53,9 +51,7 @@ class KalmanSoC():
         return self.x
     
     def update(self, z):
-        """ Integrate the measurement into estimation
-        """
-        # Give name for this matrix.
+        """ Measurement update step """
         # S = H*P*H'+R
         S = self.C*self.P*self.C + self.Q_meas_uncern
         
