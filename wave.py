@@ -1,5 +1,19 @@
 import numpy as np
 
+#Linear interpolation
+def interpolate(x, array):
+    if x < array[0][0]: return array[0][1]
+    if x > array[-1][0]: return array[-1][1]
+    for i, val in enumerate(array):
+        if val[0] == x: return val[1] 
+        elif val[0] > x:
+            (x1, y1) = array[i - 1]
+            (x2, y2) = array[i]
+            y = (x*(y1 - y2) + x1*y2 - x2*y1)/(x1 - x2)
+            return y
+    return None
+
+
 class Wave: 
     def __init__(self, waveform):
         self.signal_gain = 1
