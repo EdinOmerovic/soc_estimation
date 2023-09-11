@@ -1,0 +1,13 @@
+The measurements were done in two takes:
+
+The first measurements started: 
+30.04.2022 @ 09:33:19 and it lasted until 02.05.2022 @ 12:53:33
+
+The second measrement was started due to interuption:
+03.04.2022 @ 07:51:42 and it lasted until 04.05.2022 @ 18:18:54
+
+
+These are the actual times. The times in measurement of output_validation_charge is ofsetted by 2 hours. 
+
+In the output_validation_charge_edited I modified the outlier value of the voltage due to power supply turning on.
+This is the one to use: unified_20220430_113319_adjusted_time
